@@ -139,6 +139,11 @@ class SeekerView (View):
     """
     A list of field/column names to display by default.
     """
+    
+    show_display_tab = True
+    """
+    Allow the columns displayed to be changed.
+    """
 
     sort = None
     """
@@ -224,6 +229,11 @@ class SeekerView (View):
     permission = None
     """
     If specified, a permission to check (using ``request.user.has_perm``) for this view.
+    """
+    
+    require_search_terms = False
+    """
+    If true, the search will return no results unless facets or keywords are submitted.
     """
 
     extra_context = {}
@@ -354,7 +364,7 @@ class SeekerView (View):
         the default list is returned. If no default list is specified, all fields are displayed.
         """
         default = list(self.display) if self.display else list(self.document._doc_type.mapping)
-        return self.request.GET.getlist('d') or default
+        return self.request.GET.getlist('d') or default if self.show_display_tab else default
 
     def get_facet_data(self, initial=None, exclude=None):
         if initial is None:
@@ -397,7 +407,7 @@ class SeekerView (View):
 
     def render(self):
         querystring = self.normalized_querystring(ignore=['p'])
-
+        
         if self.request.user and self.request.user.is_authenticated() and not querystring and not self.request.is_ajax():
             default = self.request.user.seeker_searches.filter(url=self.request.path, default=True).first()
             if default and default.querystring:
@@ -436,14 +446,17 @@ class SeekerView (View):
             current_search = None
             saved_searches = []
 
-        # Finally, grab the results.
-        results = search.sort(*sort_fields)[offset:offset + self.page_size].execute()
+        return_results = True if not self.require_search_terms else (keywords or not all(not v for k,v in facets.items()))
+        
+        # Finally, if we are returning a result execute the search here.
+        results = search.sort(*sort_fields)[offset:offset + self.page_size].execute() if return_results else None
 
         context = {
             'document': self.document,
             'keywords': keywords,
             'columns': columns,
             'display_columns': [c for c in columns if c.visible],
+            'show_display_tab': self.show_display_tab,
             'facets': facets,
             'selected_facets': self.request.GET.getlist('f') or self.initial_facets.keys(),
             'form_action': self.request.path,
