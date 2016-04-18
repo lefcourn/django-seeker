@@ -436,7 +436,6 @@ class SeekerView (View):
             return self.get_search_fields(mapping=self.document._doc_type.mapping)
 
     def get_search_query_type(self, search, keywords, analyzer=DEFAULT_ANALYZER):
-<<<<<<< Upstream, based on origin/master
         kwargs = {'query': keywords,
                   'analyzer': analyzer,
                   'fields': self.get_search_fields(),
@@ -444,10 +443,6 @@ class SeekerView (View):
         if self.query_type == 'simple_query':
             kwargs['auto_generate_phrase_queries'] = True
         return search.query(self.query_type, **kwargs)
-=======
-        return search.query('query_string', query=keywords, analyzer=analyzer, fields=self.get_search_fields(),
-                            auto_generate_phrase_queries=True, default_operator=self.operator)
->>>>>>> fbf0e9c Allow SeekerView to specify query type (manual merge of #7)
 
     def get_search(self, keywords=None, facets=None, aggregate=True):
         using = self.using or self.document._doc_type.using or 'default'
