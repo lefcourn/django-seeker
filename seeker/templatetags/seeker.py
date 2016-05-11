@@ -56,7 +56,7 @@ def seeker_score(result, max_score=None, template='seeker/score.html'):
         'max_score': max_score,
         'percentile': pct * 100.0,
     })
-
+    
 @register.simple_tag
 def seeker_pager(total, page_size=10, page=1, param='p', querystring='', spread=7, template='seeker/pager.html'):
     paginator = Paginator(range(total), page_size)
