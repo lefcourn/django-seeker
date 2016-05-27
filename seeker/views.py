@@ -398,9 +398,16 @@ class SeekerView (View):
         """
         default = list(self.display) if self.display else list(self.document._doc_type.mapping)
         display_fields = self.request.GET.getlist('d') or default
-        display_fields = [f for f in display_fields if f not in self.required_display_fields]
+        list_len = len(display_fields)
         for field, i in self.required_display:
-            display_fields.insert(i, field)
+            # Remove existing instances since this position takes precedence...
+            display_fields = filter(partial(ne, field), display_fields)
+            # If within range, insert the field appropriately...
+            if i <= list_len:
+                display_fields.insert(i, field)
+            # Otherwise, append to the end
+            else:
+                display_fields.append(field)
         return display_fields
 
     def get_saved_search(self):
