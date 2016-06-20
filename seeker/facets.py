@@ -2,6 +2,7 @@ from django.conf import settings
 from elasticsearch_dsl import A, Q
 import functools
 import operator
+import copy
 
 class Facet (object):
     field = None
@@ -22,7 +23,7 @@ class Facet (object):
     def filter(self, search, values):
         return search
 
-    def data(self, response):
+    def data(self, response, values=[]):
         try:
             return response.aggregations[self.name].to_dict()
         except:
@@ -67,7 +68,7 @@ class GlobalTermsFacet (TermsFacet):
         search.aggs[self.field] = top
         return search
 
-    def data(self, response):
+    def data(self, response, values=[]):
         return response.aggregations[self.field][self.field].to_dict()
 
 class YearHistogram (Facet):
@@ -102,14 +103,71 @@ class YearHistogram (Facet):
         return bucket.get('key_as_string')
 
 class RangeFilter (Facet):
+    """
+    Facet used for ranges of digits
+    Optional:
+        ranges - list of dictionaries containing two keys: one 'gt' (or 'gte') and one 'lt' (or 'lte').
+                 When provided, this facet will ONLY filter on those ranges. Any other ranges are ignored.
+    """
     template = 'seeker/facets/range.html'
+    
+    def __init__(self, field, **kwargs):
+        self.ranges = kwargs.pop('ranges', [])
+        super(RangeFilter, self).__init__(field, **kwargs)
+        
+    def apply(self, search, **extra):
+        if self.ranges:
+            params = {'field': self.field, 'ranges': self.ranges}
+            params.update(extra)
+            search.aggs[self.name] = A('range', **params)
+        return search
 
     def filter(self, search, values):
-        if len(values) == 2:
-            r = {}
-            if values[0].isdigit():
-                r['gte'] = values[0]
-            if values[1].isdigit():
-                r['lte'] = values[1]
-            search = search.filter('range', **{self.field: r})
+        if self.ranges:
+            valid_ranges = []
+            # We only accept ranges that are defined
+            for range in self.ranges:
+                range_value = str(range.get('key'))
+                if range_value in values:
+                    valid_ranges.append(range)
+            filters = []
+            for range in valid_ranges:
+                translated_range = {}
+                if 'from' in range:
+                    translated_range['gte'] = range['from']
+                if 'to' in range:
+                    translated_range['lt'] = range['to']
+                if translated_range:
+                    filters.append(F('range', **{self.field: translated_range}))
+            if filters:
+                search = search.filter(functools.reduce(operator.or_, filters))
+        else:
+            if len(values) == 2:
+                r = {}
+                if values[0].isdigit():
+                    r['gte'] = values[0]
+                if values[1].isdigit():
+                    r['lte'] = values[1]
+                search = search.filter('range', **{self.field: r})
         return search
+    
+    def data(self, response, values=[]):
+        try:
+            facet_data = response.aggregations[self.name].to_dict()
+            buckets = copy.deepcopy(facet_data['buckets'])
+            for bucket in buckets:
+                if bucket['key'] not in values and bucket['doc_count'] == 0:
+                    facet_data['buckets'].remove(bucket)
+            return facet_data
+        except:
+            return {}
+    
+    def in_range(self, range_key, value):
+        for range in self.ranges:
+            if range['key'] == range_key:
+                if 'from' in range and range['from'] > value:
+                    return False
+                if 'to' in range and range['to'] <= value:
+                    return False
+                return True
+        return False

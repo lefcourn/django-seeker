@@ -10,6 +10,7 @@ from django.utils.safestring import mark_safe
 from django.views.generic import View
 from elasticsearch_dsl.utils import AttrList
 from seeker.templatetags.seeker import seeker_format
+from seeker.facets import RangeFilter
 from .mapping import DEFAULT_ANALYZER
 from functools import partial
 from operator import ne
@@ -424,7 +425,7 @@ class SeekerView (View):
             initial = {}
         facets = collections.OrderedDict()
         for f in self.get_facets():
-            if f.field != exclude:
+            if f != exclude:
                 facets[f] = self.request.GET.getlist(f.field) or initial.get(f.field, [])
         return facets
 
@@ -558,7 +559,7 @@ class SeekerView (View):
                 'sort': sort,
                 'saved_search_pk': saved_search.pk if saved_search else '',
                 'table_html': loader.render_to_string(self.results_template, context, context_instance=RequestContext(self.request)),
-                'facet_data': {facet.field: facet.data(results) for facet in self.get_facets()},
+                'facet_data': {facet.field: facet.data(results, facets[facet]) for facet in self.get_facets()},
             })
         else:
             return render(self.request, self.template_name, context)
@@ -571,8 +572,11 @@ class SeekerView (View):
         # We want to apply all the other facet filters besides the one we're querying.
         facets = self.get_facet_data(exclude=facet)
         search = self.get_search(keywords, facets, aggregate=False)
-        fq = '.*' + self.request.GET.get('_query', '').strip() + '.*'
-        facet.apply(search, include={'pattern': fq, 'flags': 'CASE_INSENSITIVE'})
+        if issubclass(facet.__class__, RangeFilter):
+            facet.apply(search,)
+        else:
+            fq = '.*' + self.request.GET.get('_query', '').strip() + '.*'
+            facet.apply(search, include={'pattern': fq, 'flags': 'CASE_INSENSITIVE'})
         return JsonResponse(facet.data(search.execute()))
 
     def export(self):
