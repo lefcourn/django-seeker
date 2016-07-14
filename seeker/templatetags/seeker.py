@@ -95,3 +95,7 @@ def seeker_highlight(text, query, algorithm='english'):
         else:
             parts.append(word)
     return mark_safe(''.join(parts))
+
+@register.filter
+def seeker_range_key(range):
+    return range['key'] if 'key' in range else ''
