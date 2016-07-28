@@ -113,14 +113,15 @@ class RangeFilter (Facet):
                  When provided, this facet will ONLY filter on those ranges. Any other ranges are ignored.
     """
     template = 'seeker/facets/range.html'
-    
+
     def __init__(self, field, **kwargs):
         self.ranges = kwargs.pop('ranges', [])
+        self.missing = kwargs.pop('missing', -1)
         super(RangeFilter, self).__init__(field, **kwargs)
-        
+
     def apply(self, search, **extra):
         if self.ranges:
-            params = {'field': self.field, 'ranges': self.ranges}
+            params = {'field': self.field, 'ranges': self.ranges, 'missing':self.missing}
             params.update(extra)
             search.aggs[self.name] = A('range', **params)
         return search
@@ -135,13 +136,16 @@ class RangeFilter (Facet):
                     valid_ranges.append(range)
             filters = []
             for range in valid_ranges:
-                translated_range = {}
-                if 'from' in range:
-                    translated_range['gte'] = range['from']
-                if 'to' in range:
-                    translated_range['lt'] = range['to']
-                if translated_range:
-                    filters.append(F('range', **{self.field: translated_range}))
+                if 'from' in range and range['from'] == self.missing:
+                    filters.append(~Q('exists', field=self.field))
+                else:
+                    translated_range = {}
+                    if 'from' in range:
+                        translated_range['gte'] = range['from']
+                    if 'to' in range:
+                        translated_range['lt'] = range['to']
+                    if translated_range:
+                        filters.append(Q('range', **{self.field: translated_range}))
             if filters:
                 search = search.filter(functools.reduce(operator.or_, filters))
         else:
@@ -153,7 +157,7 @@ class RangeFilter (Facet):
                     r['lte'] = values[1]
                 search = search.filter('range', **{self.field: r})
         return search
-    
+
     def data(self, response, values=[]):
         try:
             facet_data = response.aggregations[self.name].to_dict()
@@ -164,7 +168,7 @@ class RangeFilter (Facet):
             return facet_data
         except:
             return {}
-    
+
     def in_range(self, range_key, value):
         for range in self.ranges:
             if range['key'] == range_key:
