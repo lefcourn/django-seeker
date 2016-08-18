@@ -559,7 +559,7 @@ class SeekerView (View):
                 'sort': sort,
                 'saved_search_pk': saved_search.pk if saved_search else '',
                 'table_html': loader.render_to_string(self.results_template, context, context_instance=RequestContext(self.request)),
-                'facet_data': {facet.field: facet.data(results, facets[facet]) for facet in self.get_facets()},
+                'facet_data': {facet.field: facet.data(results, facets[facet]) for facet in facets},
             })
         else:
             return render(self.request, self.template_name, context)
