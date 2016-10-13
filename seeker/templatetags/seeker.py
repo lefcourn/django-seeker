@@ -36,9 +36,10 @@ def seeker_filter_querystring(qs, keep):
     return urllib.urlencode(qs_parts)
 
 @register.simple_tag
-def seeker_facet(facet, results, selected=None, **params):
+def seeker_facet(facet, facet_data, results, selected=None, **params):
     params.update({
         'facet': facet,
+        'facet_data': facet_data[facet.field],
         'selected': selected,
         'data': facet.data(results, selected),
     })
