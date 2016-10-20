@@ -9,6 +9,8 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.views.generic import View
 from elasticsearch_dsl.utils import AttrList
+from functools import partial
+from operator import ne
 from seeker.templatetags.seeker import seeker_format
 from seeker.facets import RangeFilter
 from .mapping import DEFAULT_ANALYZER
@@ -494,6 +496,8 @@ class SeekerView (View):
         facets = self.get_facet_data(initial=self.initial_facets if not self.request.is_ajax() else None)
         search = self.get_search(keywords, facets)
         columns = self.get_columns()
+        
+        facet_data = self.post_filter_facets()
 
         # Make sure we sanitize the sort fields.
         sort_fields = []
@@ -534,6 +538,7 @@ class SeekerView (View):
             'optional_columns': [c for c in columns if c.field not in self.required_display_fields],
             'display_columns': [c for c in columns if c.visible],
             'facets': facets,
+            'facet_data': facet_data,
             'selected_facets': self.request.GET.getlist('f') or self.initial_facets.keys(),
             'form_action': self.request.path,
             'results': results,
