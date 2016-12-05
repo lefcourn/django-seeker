@@ -23,19 +23,25 @@ class Facet (object):
     def filter(self, search, values):
         return search
 
-    def data(self, response, values=[]):
+    def data(self, response, values=[], **kwargs):
         try:
-            return response.aggregations[self.name].to_dict()
+            data_dict = response.aggregations[self.name].to_dict()
+            if kwargs.get('sort_facets', True) and 'buckets' in data_dict:
+                data_dict['buckets'] = sorted(data_dict['buckets'], key=self.get_facet_sort_key)
+            return data_dict
         except:
             return {}
 
     def get_key(self, bucket):
         return bucket.get('key')
+    
+    def get_facet_sort_key(self, bucket):
+        return self.get_key(bucket).lower()
 
     def buckets(self, response):
         for b in self.data(response).get('buckets', []):
             yield self.get_key(b), b.get('doc_count')
-
+            
 class TermsFacet (Facet):
 
     def __init__(self, field, **kwargs):
@@ -68,8 +74,11 @@ class GlobalTermsFacet (TermsFacet):
         search.aggs[self.field] = top
         return search
 
-    def data(self, response, values=[]):
-        return response.aggregations[self.field][self.field].to_dict()
+    def data(self, response, values=[], **kwargs):
+        data_dict = response.aggregations[self.field][self.field].to_dict()
+        if kwargs.get('sort_facets', True) and 'buckets' in data_dict:
+            data_dict['buckets'] = sorted(data_dict['buckets'], key=self.get_facet_sort_key)
+        return data_dict
 
 class YearHistogram (Facet):
     template = 'seeker/facets/year_histogram.html'
@@ -155,13 +164,15 @@ class RangeFilter (Facet):
                 search = search.filter('range', **{self.field: r})
         return search
 
-    def data(self, response, values=[]):
+    def data(self, response, values=[], **kwargs):
         try:
             facet_data = response.aggregations[self.name].to_dict()
             buckets = copy.deepcopy(facet_data['buckets'])
             for bucket in buckets:
                 if bucket['key'] not in values and bucket['doc_count'] == 0:
                     facet_data['buckets'].remove(bucket)
+            if kwargs.get('sort_facets', True) and 'buckets' in facet_data:
+                facet_data['buckets'] = sorted(data_dict['buckets'], key=self.get_facet_sort_key)
             return facet_data
         except:
             return {}
