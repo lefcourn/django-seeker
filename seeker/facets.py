@@ -172,7 +172,7 @@ class RangeFilter (Facet):
                 if bucket['key'] not in values and bucket['doc_count'] == 0:
                     facet_data['buckets'].remove(bucket)
             if kwargs.get('sort_facets', True) and 'buckets' in facet_data:
-                facet_data['buckets'] = sorted(data_dict['buckets'], key=self.get_facet_sort_key)
+                facet_data['buckets'] = sorted(facet_data['buckets'], key=self.get_facet_sort_key)
             return facet_data
         except:
             return {}
