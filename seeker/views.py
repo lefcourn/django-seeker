@@ -578,22 +578,20 @@ class SeekerView (View):
     
     def post_filter_facets(self):
         """
-        This function fakes 'post_filter' for all facets (except the one that changed) by searching each one individually and combining the results.
+        This function fakes 'post_filter' for all facets by searching each one individually and combining the results.
         """
         keywords = self.get_keywords()
-        excluded_facet = {f.field: f for f in self.get_facets()}.get(self.request.GET.get('_facet'))
         post_filtered_facet_data = {}
         total_time = 0
         for facet in self.get_facets():
-            if facet != excluded_facet:
-                facets = self.get_facet_data(exclude=facet)
-                # Get a Search using only the *other* facets (not the one we are currently iterating over)
-                search = self.get_search(keywords, facets, aggregate=False)
-                # Aggregate only on the current facet (i.e. aggregate this facet only filtering based on all other facets)
-                facet.apply(search)
-                results = search.execute() 
-                total_time += results.took 
-                post_filtered_facet_data.update({facet.field: facet.data(results, facets.get(facet, []))})
+            facets = self.get_facet_data(exclude=facet)
+            # Get a Search using only the *other* facets (not the one we are currently iterating over)
+            search = self.get_search(keywords, facets, aggregate=False)
+            # Aggregate only on the current facet (i.e. aggregate this facet only filtering based on all other facets)
+            facet.apply(search)
+            results = search.execute() 
+            total_time += results.took 
+            post_filtered_facet_data.update({facet.field: facet.data(results, facets.get(facet, []))})
         return post_filtered_facet_data
 
     def export(self):
@@ -623,7 +621,7 @@ class SeekerView (View):
         return resp
 
     def get(self, request, *args, **kwargs):
-        if '_facet' in request.GET:
+        if '_facet_data_only' in request.GET:
             return self.render_facet_query()
         elif '_export' in request.GET:
             return self.export()
